@@ -1,0 +1,449 @@
+// MP-GEA Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String     @id @default(uuid())
+  email              String     @unique
+  mobile             String     @unique
+  passwordHash       String
+  status             String     @default("PENDING_VERIFICATION") // ACTIVE, SUSPENDED, PENDING_VERIFICATION
+  resetToken         String?
+  resetTokenExpires  DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  roles              UserRole[]
+  member             Member?
+  auditLogs          AuditLog[]
+  assignedGrievances Grievance[] @relation("AssignedAdmin")
+  grievanceUpdates   GrievanceUpdate[]
+}
+
+model Role {
+  id          String     @id // SUPER_ADMIN, MEMBERSHIP_ADMIN, FINANCE_ADMIN, CONTENT_ADMIN, GRIEVANCE_ADMIN, ELECTION_ADMIN, DISTRICT_ADMIN, MEMBER
+  name        String
+  description String?
+  users       UserRole[]
+}
+
+model UserRole {
+  userId        String
+  roleId        String
+  districtScope String? // Optional district restriction for DISTRICT_ADMIN
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model District {
+  id        String   @id // e.g. 'bhopal', 'indore', 'jabalpur'
+  name      String
+  division  String
+  isActive  Boolean  @default(true)
+  members   Member[]
+}
+
+model Department {
+  id        String     @id // e.g. 'pwd', 'wrd', 'phed', 'nvda'
+  name      String
+  code      String     @unique
+  isActive  Boolean    @default(true)
+  members   Member[]
+  documents Document[]
+}
+
+model EngineeringBranch {
+  id       String   @id // e.g. 'civil', 'mechanical', 'electrical'
+  name     String
+  isActive Boolean  @default(true)
+  members  Member[]
+}
+
+model MembershipType {
+  id            String       @id // e.g. 'SERVING_ANNUAL', 'LIFE_MEMBER', 'RETIRED_MEMBER', 'HONORARY'
+  name          String
+  feeAmount     Float
+  validityYears Int
+  description   String?
+  memberships   Membership[]
+}
+
+model Member {
+  id                String              @id @default(uuid())
+  userId            String              @unique
+  membershipNumber  String?             @unique // e.g. MPGEA/2026/000001
+  fullName          String
+  gender            String?
+  dob               String?
+  photoUrl          String?
+  employeeId        String
+  organisation      String              @default("Madhya Pradesh State Government")
+  departmentId      String
+  designation       String
+  branchId          String
+  qualification     String
+  postingDistrictId String
+  postingOffice     String?
+  dateOfJoining     String
+  retirementDate    String?
+  isRetired         Boolean             @default(false)
+  status            String              @default("SUBMITTED") // DRAFT, SUBMITTED, UNDER_REVIEW, CORRECTION_REQUIRED, APPROVED_AWAITING_PAYMENT, ACTIVE, REJECTED, EXPIRED, SUSPENDED, RETIRED
+  cardIssuedAt      DateTime?
+  qrCodeHash        String?             @unique
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department        Department          @relation(fields: [departmentId], references: [id])
+  branch            EngineeringBranch   @relation(fields: [branchId], references: [id])
+  district          District            @relation(fields: [postingDistrictId], references: [id])
+
+  applications      MemberApplication[]
+  documents         MemberDocument[]
+  memberships       Membership[]
+  payments          Payment[]
+  receipts          Receipt[]
+  grievances        Grievance[]
+  eventRegistrations EventRegistration[]
+}
+
+model MemberApplication {
+  id                  String   @id @default(uuid())
+  memberId            String
+  status              String   @default("SUBMITTED")
+  adminNotes          String?
+  correctionRequested String?
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  member              Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model MemberDocument {
+  id               String   @id @default(uuid())
+  memberId         String
+  documentType     String   // DEPARTMENT_ID, APPOINTMENT_ORDER, POSTING_ORDER, DEGREE_CERTIFICATE, OTHER
+  originalFilename String
+  storedPath       String
+  mimeType         String
+  fileSize         Int
+  isVerified       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  member           Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model Membership {
+  id         String         @id @default(uuid())
+  memberId   String
+  typeId     String
+  startDate  DateTime       @default(now())
+  endDate    DateTime
+  status     String         @default("ACTIVE") // ACTIVE, EXPIRED, RENEWAL_PENDING
+  amountPaid Float
+  createdAt  DateTime       @default(now())
+
+  member     Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type       MembershipType @relation(fields: [typeId], references: [id])
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  memberId          String
+  amount            Float
+  currency          String   @default("INR")
+  razorpayOrderId   String   @unique
+  razorpayPaymentId String?  @unique
+  razorpaySignature String?
+  status            String   @default("PENDING") // PENDING, SUCCESS, FAILED, REFUNDED
+  purpose           String   // NEW_MEMBERSHIP, RENEWAL, DONATION, EVENT_FEE
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  member            Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  receipt           Receipt?
+}
+
+model Receipt {
+  id            String   @id @default(uuid())
+  receiptNumber String   @unique // MPGEA/REC/2026/0001
+  paymentId     String   @unique
+  memberId      String
+  amount        Float
+  issuedAt      DateTime @default(now())
+  receiptData   String   // JSON formatted payload
+
+  payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+}
+
+model Grievance {
+  id              String                @id @default(uuid())
+  referenceNumber String                @unique // GRV-2026-00001
+  memberId        String
+  category        String                // PROMOTION, TRANSFER, SENIORITY, PAY_ALLOWANCE, WORKING_CONDITIONS, PENSION, SERVICE_MATTER, DEPARTMENT_ISSUE, PROFESSIONAL_ISSUE, WORKPLACE_SAFETY, OTHER
+  subject         String
+  description     String
+  status          String                @default("SUBMITTED") // SUBMITTED, RECEIVED, UNDER_REVIEW, ASSIGNED, REPRESENTATION_PREPARED, SUBMITTED_TO_AUTHORITY, RESPONSE_RECEIVED, RESOLVED, CLOSED, REJECTED
+  assignedTo      String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  member          Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  assignedOfficer User?                 @relation("AssignedAdmin", fields: [assignedTo], references: [id])
+  updates         GrievanceUpdate[]
+  attachments     GrievanceAttachment[]
+}
+
+model GrievanceUpdate {
+  id           String    @id @default(uuid())
+  grievanceId  String
+  updatedBy    String
+  statusChange String?
+  message      String
+  isInternal   Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  grievance    Grievance @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [updatedBy], references: [id])
+}
+
+model GrievanceAttachment {
+  id               String    @id @default(uuid())
+  grievanceId      String
+  storedPath       String
+  originalFilename String
+  mimeType         String
+  uploadedBy       String
+  createdAt        DateTime  @default(now())
+
+  grievance        Grievance @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
+}
+
+model Representation {
+  id                 String   @id @default(uuid())
+  title              String
+  category           String
+  summary            String
+  authorityAddressed String
+  currentStage       String   // ISSUE_RECEIVED, COMMITTEE_REVIEWED, REPRESENTATION_PREPARED, SUBMITTED_TO_GOVERNMENT, MEETING_HELD, UNDER_CONSIDERATION, RESOLVED
+  visibility         String   @default("MEMBERS_ONLY") // PUBLIC, MEMBERS_ONLY
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Document {
+  id           String      @id @default(uuid())
+  title        String
+  orderNumber  String?
+  issueDate    String
+  year         Int
+  departmentId String?
+  category     String      // GOVERNMENT_ORDER, SERVICE_RULES, PROMOTION_SENIORITY, TRANSFER_POLICY, PAY_ALLOWANCES, PENSION, DEPARTMENT_CIRCULAR, TECHNICAL_DOCUMENT, ASSOCIATION_CIRCULAR, FORMS, COURT_TRIBUNAL_ORDER, OTHER
+  filePath     String
+  fileSize     Int
+  mimeType     String
+  visibility   String      @default("PUBLIC") // PUBLIC, MEMBERS_ONLY, ADMIN_ONLY
+  isPublished  Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  department   Department? @relation(fields: [departmentId], references: [id])
+}
+
+model Election {
+  id                     String              @id @default(uuid())
+  title                  String
+  electionYear           Int
+  description            String
+  returningOfficerName   String
+  returningOfficerContact String?
+  status                 String              @default("ANNOUNCED") // ANNOUNCED, NOMINATIONS, SCRUTINY, WITHDRAWAL, FINAL_CANDIDATES, VOTING_DAY, COUNTING, RESULTS_DECLARED, ARCHIVED
+  nominationStart        String?
+  nominationEnd          String?
+  scrutinyDate           String?
+  withdrawalDate         String?
+  pollingDate            String?
+  pollingTime            String?
+  pollingVenue           String
+  countingDate           String?
+  rulesDocumentUrl       String?
+  isActive               Boolean             @default(true)
+  createdAt              DateTime            @default(now())
+
+  posts                  ElectionPost[]
+  results                ElectionResult[]
+}
+
+model ElectionPost {
+  id           String              @id @default(uuid())
+  electionId   String
+  postTitle    String              // President, Vice President, General Secretary, Treasurer, Executive Member
+  displayOrder Int                 @default(0)
+
+  election     Election            @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidates   ElectionCandidate[]
+}
+
+model ElectionCandidate {
+  id               String       @id @default(uuid())
+  postId           String
+  candidateName    String
+  designation      String
+  department       String
+  photoUrl         String?
+  shortBio         String?
+  nominationStatus String       @default("ACCEPTED") // NOMINATED, ACCEPTED, WITHDRAWN, REJECTED
+  votesReceived    Int?
+  isWinner         Boolean      @default(false)
+
+  post             ElectionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model ElectionResult {
+  id                 String   @id @default(uuid())
+  electionId         String
+  declaredAt         DateTime @default(now())
+  certificationNotes String?
+  certifiedBy        String   // Returning Officer Signatory
+
+  election           Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id                 String              @id @default(uuid())
+  title              String
+  description        String
+  venue              String
+  eventDate          String
+  startTime          String?
+  endTime            String?
+  capacity           Int                 @default(200)
+  visibility         String              @default("PUBLIC") // PUBLIC, MEMBERS_ONLY
+  isRegistrationOpen Boolean             @default(true)
+  imageUrl           String?
+  createdAt          DateTime            @default(now())
+
+  registrations      EventRegistration[]
+}
+
+model EventRegistration {
+  id           String   @id @default(uuid())
+  eventId      String
+  memberId     String
+  registeredAt DateTime @default(now())
+  status       String   @default("CONFIRMED")
+
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member       Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+}
+
+model NewsArticle {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String   @unique
+  excerpt     String
+  content     String
+  category    String   // PRESS_RELEASE, CADRE_UPDATE, ANNOUNCEMENT
+  imageUrl    String?
+  isFeatured  Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model GalleryAlbum {
+  id            String        @id @default(uuid())
+  title         String
+  description   String?
+  coverImageUrl String?
+  eventDate     String?
+  createdAt     DateTime      @default(now())
+
+  items         GalleryItem[]
+}
+
+model GalleryItem {
+  id           String       @id @default(uuid())
+  albumId      String
+  imageUrl     String
+  caption      String?
+  displayOrder Int          @default(0)
+
+  album        GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+}
+
+model FinancialEntry {
+  id          String   @id @default(uuid())
+  type        String   // INCOME, EXPENSE
+  category    String   // MEMBERSHIP_SUBSCRIPTION, CONFERENCE_REGISTRATION, LEGAL_DEFENSE, ADMINISTRATIVE, OFFICE_EXPENSES
+  amount      Float
+  date        String
+  description String
+  referenceNo String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+}
+
+model FinancialReport {
+  id            String   @id @default(uuid())
+  financialYear String   // e.g. 2025-2026
+  title         String
+  reportType    String   // AUDITED_BALANCE_SHEET, ANNUAL_EXPENDITURE, BUDGET_ESTIMATE
+  fileUrl       String
+  visibility    String   @default("PUBLIC") // PUBLIC, MEMBERS_ONLY
+  createdAt     DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?  // Sanitized JSON
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation(fields: [actorId], references: [id])
+}
+
+model ContactEnquiry {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  mobile    String
+  subject   String
+  message   String
+  status    String   @default("PENDING") // PENDING, REPLIED, ARCHIVED
+  createdAt DateTime @default(now())
+}
+
+model SiteSetting {
+  key       String   @id
+  value     String   // JSON string
+  updatedAt DateTime @updatedAt
+}

@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight text-navy-900;
+  }
+}
+
+/* Custom engineering grid pattern */
+.bg-grid-pattern {
+  background-image: radial-gradient(rgba(13, 148, 136, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@media print {
+  header, footer, aside, .no-print {
+    display: none !important;
+  }
+}
