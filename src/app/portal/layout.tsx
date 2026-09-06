@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { PortalNav } from '@/components/portal/PortalNav';
 
+// Prevent static pre-rendering — portal pages must be server-rendered on demand
+export const dynamic = 'force-dynamic';
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
 

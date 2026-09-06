@@ -1,8 +1,12 @@
 import React from 'react';
+
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 import { AdminNav } from '@/components/admin/AdminNav';
+
+// Prevent static pre-rendering — admin pages must be server-rendered on demand
+export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
