@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { db } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { NoticeTicker } from '@/components/public/NoticeTicker';
 import {
   FileText,
@@ -19,43 +20,55 @@ import {
 export const revalidate = 60; // Refresh cache every 60 seconds
 
 export default async function HomePage() {
-  // Real database-backed statistics (NO fake counters)
-  const [
-    activeMembersCount,
-    districtsCount,
-    departmentsCount,
-    circularsCount,
-    latestCirculars,
-    urgentNotices,
-    upcomingEvents,
-    representations,
-  ] = await Promise.all([
-    db.member.count({ where: { status: 'ACTIVE' } }),
-    db.district.count({ where: { isActive: true } }),
-    db.department.count({ where: { isActive: true } }),
-    db.document.count({ where: { isPublished: true } }),
-    db.document.findMany({
-      where: { isPublished: true },
-      orderBy: { createdAt: 'desc' },
-      take: 4,
-      include: { department: true },
-    }),
-    db.document.findMany({
-      where: { category: 'ASSOCIATION_CIRCULAR', isPublished: true },
-      orderBy: { createdAt: 'desc' },
-      take: 1,
-    }),
-    db.event.findMany({
-      where: { visibility: 'PUBLIC' },
-      orderBy: { eventDate: 'asc' },
-      take: 3,
-    }),
-    db.representation.findMany({
-      where: { visibility: 'PUBLIC' },
-      orderBy: { updatedAt: 'desc' },
-      take: 2,
-    }),
-  ]);
+  // Real database-backed statistics — falls back to zeros/empty in demo mode
+  let activeMembersCount = 0;
+  let districtsCount = 0;
+  let departmentsCount = 0;
+  let circularsCount = 0;
+  type DocWithDept = Prisma.DocumentGetPayload<{ include: { department: true } }>;
+  let latestCirculars: DocWithDept[] = [];
+  let urgentNotices: Awaited<ReturnType<typeof db.document.findMany>> = [];
+  let upcomingEvents: Awaited<ReturnType<typeof db.event.findMany>> = [];
+  let representations: Awaited<ReturnType<typeof db.representation.findMany>> = [];
+
+  try {
+    [
+      activeMembersCount,
+      districtsCount,
+      departmentsCount,
+      circularsCount,
+      latestCirculars,
+      urgentNotices,
+      upcomingEvents,
+      representations,
+    ] = await Promise.all([
+      db.member.count({ where: { status: 'ACTIVE' } }),
+      db.district.count({ where: { isActive: true } }),
+      db.department.count({ where: { isActive: true } }),
+      db.document.count({ where: { isPublished: true } }),
+      db.document.findMany({
+        where: { isPublished: true },
+        orderBy: { createdAt: 'desc' },
+        take: 4,
+        include: { department: true },
+      }),
+      db.document.findMany({
+        where: { category: 'ASSOCIATION_CIRCULAR', isPublished: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      }),
+      db.event.findMany({
+        where: { visibility: 'PUBLIC' },
+        orderBy: { eventDate: 'asc' },
+        take: 3,
+      }),
+      db.representation.findMany({
+        where: { visibility: 'PUBLIC' },
+        orderBy: { updatedAt: 'desc' },
+        take: 2,
+      }),
+    ]);
+  } catch { /* DB not available in demo mode — fallback values used */ }
 
   const tickerItems = urgentNotices.map((n) => ({
     id: n.id,

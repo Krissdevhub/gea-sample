@@ -1,14 +1,19 @@
-
 import React from 'react';
 import { db } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { FileText, Download, ExternalLink, Filter } from 'lucide-react';
 
+type DocumentWithDept = Prisma.DocumentGetPayload<{ include: { department: true } }>;
+
 export default async function OrdersPage() {
-  const documents = await db.document.findMany({
-    where: { isPublished: true },
-    orderBy: { createdAt: 'desc' },
-    include: { department: true },
-  });
+  let documents: DocumentWithDept[] = [];
+  try {
+    documents = await db.document.findMany({
+      where: { isPublished: true },
+      orderBy: { createdAt: 'desc' },
+      include: { department: true },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-8">

@@ -4,10 +4,13 @@ import { db } from '@/lib/db';
 import { Download } from 'lucide-react';
 
 export default async function CircularsPage() {
-  const circulars = await db.document.findMany({
-    where: { category: 'ASSOCIATION_CIRCULAR', isPublished: true },
-    orderBy: { createdAt: 'desc' },
-  });
+  let circulars: Awaited<ReturnType<typeof db.document.findMany>> = [];
+  try {
+    circulars = await db.document.findMany({
+      where: { category: 'ASSOCIATION_CIRCULAR', isPublished: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">

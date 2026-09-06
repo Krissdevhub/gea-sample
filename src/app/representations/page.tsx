@@ -3,9 +3,12 @@ import React from 'react';
 import { db } from '@/lib/db';
 
 export default async function RepresentationsPage() {
-  const reps = await db.representation.findMany({
-    orderBy: { updatedAt: 'desc' },
-  });
+  let reps: Awaited<ReturnType<typeof db.representation.findMany>> = [];
+  try {
+    reps = await db.representation.findMany({
+      orderBy: { updatedAt: 'desc' },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">

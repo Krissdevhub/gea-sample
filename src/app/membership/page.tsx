@@ -5,7 +5,10 @@ import { db } from '@/lib/db';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 
 export default async function MembershipPage() {
-  const plans = await db.membershipType.findMany();
+  let plans: Awaited<ReturnType<typeof db.membershipType.findMany>> = [];
+  try {
+    plans = await db.membershipType.findMany();
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">

@@ -3,9 +3,12 @@ import React from 'react';
 import { db } from '@/lib/db';
 
 export default async function NewsPage() {
-  const articles = await db.newsArticle.findMany({
-    orderBy: { publishedAt: 'desc' },
-  });
+  let articles: Awaited<ReturnType<typeof db.newsArticle.findMany>> = [];
+  try {
+    articles = await db.newsArticle.findMany({
+      orderBy: { publishedAt: 'desc' },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">

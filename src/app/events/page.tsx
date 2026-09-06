@@ -5,10 +5,13 @@ import { Calendar, MapPin, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 export default async function EventsPage() {
-  const events = await db.event.findMany({
-    where: { visibility: 'PUBLIC' },
-    orderBy: { eventDate: 'asc' },
-  });
+  let events: Awaited<ReturnType<typeof db.event.findMany>> = [];
+  try {
+    events = await db.event.findMany({
+      where: { visibility: 'PUBLIC' },
+      orderBy: { eventDate: 'asc' },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">

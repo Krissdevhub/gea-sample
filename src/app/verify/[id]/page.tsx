@@ -1,28 +1,36 @@
 
 import React from 'react';
 import { db } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
+
+type MemberWithRelations = Prisma.MemberGetPayload<{
+  include: { department: true; branch: true; district: true };
+}> | null;
 
 export default async function VerifyMemberPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const rawId = resolvedParams.id;
   const decodedNumber = rawId.replace(/-/g, '/');
 
-  const member = await db.member.findFirst({
-    where: {
-      OR: [
-        { membershipNumber: decodedNumber },
-        { id: rawId },
-        { qrCodeHash: rawId },
-      ],
-    },
-    include: {
-      department: true,
-      branch: true,
-      district: true,
-    },
-  });
+  let member: MemberWithRelations = null;
+  try {
+    member = await db.member.findFirst({
+      where: {
+        OR: [
+          { membershipNumber: decodedNumber },
+          { id: rawId },
+          { qrCodeHash: rawId },
+        ],
+      },
+      include: {
+        department: true,
+        branch: true,
+        district: true,
+      },
+    });
+  } catch { /* DB not available in demo mode */ }
 
   if (!member) {
     return (

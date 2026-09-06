@@ -1,17 +1,25 @@
 
 import React from 'react';
 import { db } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { Vote, AlertTriangle, Calendar, MapPin, UserCheck } from 'lucide-react';
 
+type ElectionWithPosts = Prisma.ElectionGetPayload<{
+  include: { posts: { include: { candidates: true } } };
+}> | null;
+
 export default async function ElectionsPage() {
-  const election = await db.election.findFirst({
-    where: { isActive: true },
-    include: {
-      posts: {
-        include: { candidates: true },
+  let election: ElectionWithPosts = null;
+  try {
+    election = await db.election.findFirst({
+      where: { isActive: true },
+      include: {
+        posts: {
+          include: { candidates: true },
+        },
       },
-    },
-  });
+    });
+  } catch { /* DB not available in demo mode */ }
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-8">
