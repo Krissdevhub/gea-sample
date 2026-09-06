@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db } from './db';
+import { getDemoSession } from './demo-users';
 
 const SESSION_COOKIE = 'mpgea_session';
 const JWT_SECRET = process.env.SESSION_SECRET || 'fallback-mpgea-secret-key-32-chars-long';
@@ -59,32 +59,50 @@ export async function getSession(): Promise<SessionUser | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE)?.value;
     if (!token) return null;
+
     const session = verifySessionToken(token);
     if (!session) return null;
 
-    // Refresh member details from DB
-    const user = await db.user.findUnique({
-      where: { id: session.id },
-      include: {
-        roles: true,
-        member: true,
-      },
-    });
+    // ─────────────────────────────────────────────────────────────
+    // DEMO MODE: Return session directly (no DB call needed)
+    // ─────────────────────────────────────────────────────────────
+    if (session.id.startsWith('demo-')) {
+      return getDemoSession(session.id) as SessionUser | null;
+    }
 
-    if (!user || user.status === 'SUSPENDED') return null;
+    // ─────────────────────────────────────────────────────────────
+    // REAL DB: Refresh member details from database
+    // ─────────────────────────────────────────────────────────────
+    try {
+      const { db } = await import('./db');
 
-    return {
-      id: user.id,
-      email: user.email,
-      mobile: user.mobile,
-      roles: user.roles.map((r) => r.roleId),
-      districtScope: user.roles.find((r) => r.districtScope)?.districtScope || null,
-      memberId: user.member?.id || null,
-      memberName: user.member?.fullName || null,
-      membershipNumber: user.member?.membershipNumber || null,
-      membershipStatus: user.member?.status || null,
-    };
+      const user = await db.user.findUnique({
+        where: { id: session.id },
+        include: {
+          roles: true,
+          member: true,
+        },
+      });
+
+      if (!user || user.status === 'SUSPENDED') return null;
+
+      return {
+        id: user.id,
+        email: user.email,
+        mobile: user.mobile,
+        roles: user.roles.map((r) => r.roleId),
+        districtScope: user.roles.find((r) => r.districtScope)?.districtScope || null,
+        memberId: user.member?.id || null,
+        memberName: user.member?.fullName || null,
+        membershipNumber: user.member?.membershipNumber || null,
+        membershipStatus: user.member?.status || null,
+      };
+    } catch {
+      // DB not yet connected — return JWT session as-is
+      return session;
+    }
   } catch {
     return null;
   }
 }
+

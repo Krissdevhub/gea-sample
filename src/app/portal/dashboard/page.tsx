@@ -3,7 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { DEMO_MEMBER_DATA } from '@/lib/demo-users';
 import {
   CreditCard,
   FileText,
@@ -25,17 +25,33 @@ export default async function MemberDashboardPage() {
     redirect('/login');
   }
 
-  const member = await db.member.findUnique({
-    where: { id: session.memberId },
-    include: {
-      department: true,
-      branch: true,
-      district: true,
-      applications: { orderBy: { createdAt: 'desc' }, take: 1 },
-      payments: { orderBy: { createdAt: 'desc' }, take: 1 },
-      grievances: { orderBy: { createdAt: 'desc' }, take: 2 },
-    },
-  });
+  // ─────────────────────────────────────────────────────────────
+  // DEMO MODE: Use hardcoded member data (no DB needed)
+  // ─────────────────────────────────────────────────────────────
+  let member: typeof DEMO_MEMBER_DATA | null = null;
+
+  if (session.memberId.startsWith('demo-')) {
+    member = DEMO_MEMBER_DATA;
+  } else {
+    // REAL DB: Fetch member with all relations
+    try {
+      const { db } = await import('@/lib/db');
+      member = await db.member.findUnique({
+        where: { id: session.memberId },
+        include: {
+          department: true,
+          branch: true,
+          district: true,
+          applications: { orderBy: { createdAt: 'desc' }, take: 1 },
+          payments: { orderBy: { createdAt: 'desc' }, take: 1 },
+          grievances: { orderBy: { createdAt: 'desc' }, take: 2 },
+        },
+      }) as typeof DEMO_MEMBER_DATA | null;
+    } catch {
+      // DB not connected, use demo data as fallback
+      member = DEMO_MEMBER_DATA;
+    }
+  }
 
   if (!member) {
     redirect('/login');

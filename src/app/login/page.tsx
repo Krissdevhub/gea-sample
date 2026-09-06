@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Lock, User, AlertCircle } from 'lucide-react';
+import { Lock, User, AlertCircle, Info } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,6 +40,17 @@ export default function LoginPage() {
     }
   };
 
+  // Quick-fill demo credentials
+  const fillDemo = (type: 'admin' | 'member') => {
+    if (type === 'admin') {
+      setIdentifier('admin@mpgea.org');
+      setPassword('Admin@mpgea2026');
+    } else {
+      setIdentifier('member@mpgea.org');
+      setPassword('Member@mpgea2026');
+    }
+  };
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-xl p-8 space-y-6">
@@ -47,8 +58,37 @@ export default function LoginPage() {
           <div className="w-12 h-12 bg-navy-900 text-teal-400 rounded-xl flex items-center justify-center text-2xl mx-auto shadow-md border-2 border-teal-500">
             ⚙️
           </div>
-          <h1 className="text-2xl font-extrabold text-navy-900">Member & Admin Login</h1>
-          <p className="text-xs text-slate-500">Madhya Pradesh Government Engineers’ Association</p>
+          <h1 className="text-2xl font-extrabold text-navy-900">Member &amp; Admin Login</h1>
+          <p className="text-xs text-slate-500">Madhya Pradesh Government Engineers' Association</p>
+        </div>
+
+        {/* Demo Credentials Box */}
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2">
+          <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-2">
+            <Info className="w-4 h-4" />
+            <span>Demo Credentials (No Database Required)</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => fillDemo('admin')}
+              className="p-2.5 bg-white border border-amber-300 rounded-lg text-left hover:border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+            >
+              <div className="font-bold text-amber-900 text-[11px] uppercase tracking-wide">Admin Panel</div>
+              <div className="text-slate-700 mt-0.5 font-mono text-[10px]">admin@mpgea.org</div>
+              <div className="text-slate-500 font-mono text-[10px]">Admin@mpgea2026</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => fillDemo('member')}
+              className="p-2.5 bg-white border border-amber-300 rounded-lg text-left hover:border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+            >
+              <div className="font-bold text-amber-900 text-[11px] uppercase tracking-wide">Member Portal</div>
+              <div className="text-slate-700 mt-0.5 font-mono text-[10px]">member@mpgea.org</div>
+              <div className="text-slate-500 font-mono text-[10px]">Member@mpgea2026</div>
+            </button>
+          </div>
+          <p className="text-[10px] text-amber-700 text-center pt-1">👆 Click a box to auto-fill credentials</p>
         </div>
 
         {error && (
@@ -87,10 +127,6 @@ export default function LoginPage() {
               />
               <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             </div>
-          </div>
-
-          <div className="flex justify-between items-center text-[11px]">
-            <span className="text-slate-500">Demo: admin@mpgea.org / Admin@mpgea2026</span>
           </div>
 
           <button

@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { db } from '@/lib/db';
+import { DEMO_ADMIN_STATS } from '@/lib/demo-users';
 import {
   Users,
   UserCheck,
@@ -17,35 +17,71 @@ import {
 export const revalidate = 0; // Live dynamic data
 
 export default async function AdminOverviewPage() {
-  const [
-    totalMembers,
-    activeMembers,
-    pendingApplications,
-    correctionRequired,
-    openGrievances,
-    totalDocuments,
-    recentApplications,
-    recentPayments,
-  ] = await Promise.all([
-    db.member.count(),
-    db.member.count({ where: { status: 'ACTIVE' } }),
-    db.member.count({ where: { status: 'SUBMITTED' } }),
-    db.member.count({ where: { status: 'CORRECTION_REQUIRED' } }),
-    db.grievance.count({ where: { status: { notIn: ['RESOLVED', 'CLOSED', 'REJECTED'] } } }),
-    db.document.count(),
-    db.member.findMany({
-      where: { status: { in: ['SUBMITTED', 'CORRECTION_REQUIRED'] } },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: { department: true, district: true },
-    }),
-    db.payment.findMany({
-      where: { status: 'SUCCESS' },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: { member: true },
-    }),
-  ]);
+  // ─────────────────────────────────────────────────────────────
+  // Try real DB first; fall back to demo stats if DB unavailable
+  // ─────────────────────────────────────────────────────────────
+  let stats = DEMO_ADMIN_STATS;
+
+  try {
+    const { db } = await import('@/lib/db');
+    const [
+      totalMembers,
+      activeMembers,
+      pendingApplications,
+      correctionRequired,
+      openGrievances,
+      totalDocuments,
+      recentApplications,
+      recentPayments,
+    ] = await Promise.all([
+      db.member.count(),
+      db.member.count({ where: { status: 'ACTIVE' } }),
+      db.member.count({ where: { status: 'SUBMITTED' } }),
+      db.member.count({ where: { status: 'CORRECTION_REQUIRED' } }),
+      db.grievance.count({ where: { status: { notIn: ['RESOLVED', 'CLOSED', 'REJECTED'] } } }),
+      db.document.count(),
+      db.member.findMany({
+        where: { status: { in: ['SUBMITTED', 'CORRECTION_REQUIRED'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { department: true, district: true },
+      }),
+      db.payment.findMany({
+        where: { status: 'SUCCESS' },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: { member: true },
+      }),
+    ]);
+
+    stats = {
+      totalMembers,
+      activeMembers,
+      pendingApplications,
+      correctionRequired,
+      openGrievances,
+      totalDocuments,
+      recentApplications: recentApplications.map((app) => ({
+        id: app.id,
+        fullName: app.fullName,
+        designation: app.designation,
+        department: { name: app.department.name },
+        district: { name: app.district.name },
+      })),
+      recentPayments: recentPayments.map((p) => ({
+        id: p.id,
+        member: { fullName: p.member.fullName },
+        purpose: p.purpose,
+        amount: p.amount,
+        createdAt: p.createdAt,
+      })),
+    };
+  } catch {
+    // DB not yet connected — using demo stats
+    console.log('[Admin] DB unavailable, using demo stats');
+  }
+
+  const { totalMembers, activeMembers, pendingApplications, correctionRequired, openGrievances, totalDocuments, recentApplications, recentPayments } = stats;
 
   return (
     <div className="space-y-8">
